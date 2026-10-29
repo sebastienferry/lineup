@@ -7,10 +7,22 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 APP_NAME="Lineup"
-DEST="${BACKLOGBAR_DEST:-$HOME/Applications}"
-BIN_DIR="${BACKLOGBAR_BIN_DIR:-$HOME/.local/bin}"
+DEST="${LINEUP_DEST:-$HOME/Applications}"
+BIN_DIR="${LINEUP_BIN_DIR:-$HOME/.local/bin}"
 VERSION="$(sed -n 's/^## \[\([0-9][0-9.]*\)\].*/\1/p' CHANGELOG.md | head -1)"
 VERSION="${VERSION:-0.0.0}"
+
+# Since the macOS 27 SDK, SwiftUI's @State is a macro whose implementation ships with Xcode
+# only. With the Command Line Tools alone, build against the newest macOS 26 SDK, where it is
+# still a property wrapper. SDKROOT set by the caller wins.
+TOOLCHAIN="$(dirname "$(dirname "$(xcrun --find swift)")")"
+if [[ -z "${SDKROOT:-}" && ! -e "$TOOLCHAIN/lib/swift/host/plugins/libSwiftUIMacros.dylib" ]]; then
+  SDK26="$(ls -d "$(xcrun --show-sdk-platform-path 2>/dev/null || echo /Library/Developer/CommandLineTools)"/../SDKs/MacOSX26*.sdk /Library/Developer/CommandLineTools/SDKs/MacOSX26*.sdk 2>/dev/null | sort -V | tail -1 || true)"
+  if [[ -n "$SDK26" ]]; then
+    export SDKROOT="$SDK26"
+    echo "No SwiftUI macros in this toolchain: building with $(basename "$SDKROOT")"
+  fi
+fi
 
 swift build -c release --product "$APP_NAME"
 swift build -c release --product lineup-notify

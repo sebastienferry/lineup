@@ -114,12 +114,12 @@ await check("a key typed in the search reads as a ticket key") {
 }
 await check("pinned keys are saved once and removed") {
     let url = FileManager.default.temporaryDirectory.appendingPathComponent("lineup-pinned-\(UUID().uuidString).json")
-    let pins = PinnedTickets(url: url)
-    try pins.pin("PE-1")
-    try pins.pin("PE-1")
-    try pins.pin("OPS-7")
+    let pins = TicketKeyList(url: url)
+    try pins.add("PE-1")
+    try pins.add("PE-1")
+    try pins.add("OPS-7")
     try expect(pins.keys(), ["PE-1", "OPS-7"])
-    try pins.unpin("PE-1")
+    try pins.remove("PE-1")
     try expect(pins.keys(), ["OPS-7"])
     try? FileManager.default.removeItem(at: url)
 }
@@ -132,6 +132,18 @@ await check("pinned tickets are fetched open only, in one query") {
     try expect(jql, "key in (PE-1, OPS-7) AND statusCategory != Done")
 }
 
+await check("a hidden ticket leaves both parts of the list, its block included") {
+    let block = AgendaEvent(
+        id: "e", title: "SFE-2 Rotate", start: Date().addingTimeInterval(3600), end: Date().addingTimeInterval(7200), isAllDay: false, meetURL: nil
+    )
+    let tickets = [ticket("SFE-1", "High"), ticket("SFE-2", "Low"), ticket("SFE-3", "Medium")]
+    let backlog = Backlog(tickets: tickets, events: [block], projects: ["SFE"], hiddenKeys: ["SFE-2", "SFE-3"])
+    try expect(backlog.unscheduled.map(\.key), ["SFE-1"])
+    try expect(backlog.blocked.isEmpty, true)
+    try expect(backlog.hidden.map(\.key), ["SFE-3", "SFE-2"])
+    // The search still finds a hidden ticket, in its own part.
+    try expect(backlog.filtered(by: "summary sfe-2").hidden.map(\.key), ["SFE-2"])
+}
 await check("a calendar block naming an open ticket takes it out of the unscheduled ones") {
     let now = parseLocalMinute("2026-10-20 08:00")!
     func event(_ title: String, _ start: String, _ end: String) -> AgendaEvent {

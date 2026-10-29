@@ -23,7 +23,9 @@ final class Store: ObservableObject {
     /// The search query; empty shows everything.
     @Published var query = ""
     /// The keys pinned by hand; their open tickets join the list.
-    @Published private(set) var pinned: [String] = PinnedTickets().keys()
+    @Published private(set) var pinned: [String] = TicketKeyList.pinned.keys()
+    /// The keys hidden by hand; their tickets leave the list and are never planned.
+    @Published private(set) var hidden: [String] = TicketKeyList.hidden.keys()
     @Published private(set) var isPlanning = false
     /// The notifications of the inbox, newest first, reloaded as soon as the file changes.
     @Published private(set) var inboxItems: [InboxItem] = []
@@ -36,7 +38,7 @@ final class Store: ObservableObject {
     private var inboxTimer: Timer?
 
     var jira: JiraClient { JiraClient(config: config) }
-    var backlog: Backlog { Backlog(tickets: tickets, events: upcoming, projects: projects) }
+    var backlog: Backlog { Backlog(tickets: tickets, events: upcoming, projects: projects, hiddenKeys: Set(hidden)) }
     /// Upcoming events over the planning horizon: the agenda shows the first days, the backlog
     /// links tickets to their blocks across all of them.
     @Published private(set) var upcoming: [AgendaEvent] = []
@@ -96,7 +98,8 @@ final class Store: ObservableObject {
         config = Config.load()
         var errors: [String] = []
 
-        pinned = PinnedTickets().keys()
+        pinned = TicketKeyList.pinned.keys()
+        hidden = TicketKeyList.hidden.keys()
         let pinnedKeys = pinned
         async let ticketsResult = capture { () -> [Ticket] in
             let found = try await self.jira.search()
@@ -270,14 +273,27 @@ final class Store: ObservableObject {
     func pin(_ key: String) {
         perform(on: key, done: "📌 \(key) épinglé") {
             let ticket = try await self.jira.ticket(key: key)
-            try PinnedTickets().pin(ticket.key)
+            try TicketKeyList.pinned.add(ticket.key)
             self.query = ""
         }
     }
 
     func unpin(_ key: String) {
         perform(on: key, done: "\(key) retiré de la liste") {
-            try PinnedTickets().unpin(key)
+            try TicketKeyList.pinned.remove(key)
+        }
+    }
+
+    /// Takes a ticket out of the list and out of planning, until it is shown again.
+    func hide(_ key: String) {
+        perform(on: key, done: "🙈 \(key) masqué") {
+            try TicketKeyList.hidden.add(key)
+        }
+    }
+
+    func unhide(_ key: String) {
+        perform(on: key, done: "\(key) de nouveau dans la liste") {
+            try TicketKeyList.hidden.remove(key)
         }
     }
 

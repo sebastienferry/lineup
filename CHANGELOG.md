@@ -6,6 +6,16 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+### Added
+
+- Hide a ticket from the list (👁 barré on hover): it leaves both sections and is never offered
+  to the planner, until shown again from the folded "Masqués" section at the bottom.
+
+### Fixed
+
+- `install.sh` builds with the Command Line Tools alone on macOS 27, whose SDK needs Xcode's
+  SwiftUI macros: it falls back to the newest macOS 26 SDK.
+
 ### Removed
 
 - Reminders: Lineup no longer reads or writes reminders. The list shows the tickets with a

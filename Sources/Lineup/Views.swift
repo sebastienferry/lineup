@@ -248,6 +248,7 @@ struct AddBar: View {
 
 struct ListContent: View {
     @EnvironmentObject var store: Store
+    @State private var showsHidden = false
 
     var body: some View {
         let backlog = store.visibleBacklog
@@ -279,6 +280,24 @@ struct ListContent: View {
             }
             ForEach(backlog.unscheduled) { ticket in
                 TicketRow(ticket: ticket)
+            }
+            if !backlog.hidden.isEmpty {
+                // Folded by default: hidden tickets are out of the way until asked for.
+                Button {
+                    showsHidden.toggle()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: showsHidden ? "chevron.down" : "chevron.right").font(.caption2)
+                        SectionTitle(text: "Masqués", count: backlog.hidden.count).padding(.horizontal, -12)
+                    }
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 12)
+                if showsHidden {
+                    ForEach(backlog.hidden) { ticket in
+                        HiddenRow(ticket: ticket)
+                    }
+                }
             }
         }
         .padding(.bottom, 8)
@@ -336,6 +355,7 @@ struct TicketRow: View {
                         store.step(ticket, by: 1)
                     }
                 }
+                IconButton(symbol: "eye.slash", help: "Masquer : ni dans la liste, ni planifié") { store.hide(ticket.key) }
                 IconButton(symbol: "wand.and.stars", help: "Trouver un créneau avec Claude", isEnabled: !store.isPlanning) {
                     store.plan(only: ticket)
                 }
@@ -435,8 +455,26 @@ struct BlockedRow: View {
             Text(ticket.summary).lineLimit(1).truncationMode(.tail).help(ticket.summary)
             Spacer(minLength: 4)
             if isHovered {
+                IconButton(symbol: "eye.slash", help: "Masquer : ni dans la liste, ni planifié") { store.hide(ticket.key) }
                 IconButton(symbol: "calendar.badge.minus", help: "Retirer le bloc de l’agenda") { store.unblock(item) }
             }
+        }
+    }
+}
+
+/// A hidden ticket, dimmed, with a button to bring it back to the list.
+struct HiddenRow: View {
+    @EnvironmentObject var store: Store
+    let ticket: Ticket
+    @State private var isHovered = false
+
+    var body: some View {
+        Row(isHovered: $isHovered, isBusy: store.busy.contains(ticket.key)) {
+            PriorityBadge(priority: ticket.priority)
+            KeyLink(key: ticket.key)
+            Text(ticket.summary).lineLimit(1).truncationMode(.tail).foregroundStyle(.secondary).help(ticket.summary)
+            Spacer(minLength: 4)
+            IconButton(symbol: "eye", help: "Réafficher dans la liste") { store.unhide(ticket.key) }
         }
     }
 }

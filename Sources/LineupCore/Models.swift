@@ -93,11 +93,16 @@ public struct Backlog: Equatable, Sendable {
     /// Tickets with a block in the calendar, soonest first.
     public let blocked: [Blocked]
     public let unscheduled: [Ticket]
+    /// Tickets the user hid: in neither part, and never offered to the planner.
+    public let hidden: [Ticket]
 
     /// `events` are the upcoming calendar events; the ones whose title names an open ticket
-    /// take that ticket out of the unscheduled ones until they are over.
-    public init(tickets: [Ticket], events: [AgendaEvent] = [], projects: [String], now: Date = Date()) {
-        let byKey = Dictionary(tickets.map { ($0.key, $0) }, uniquingKeysWith: { first, _ in first })
+    /// take that ticket out of the unscheduled ones until they are over. `hiddenKeys` are the
+    /// tickets the user took out of the list.
+    public init(tickets: [Ticket], events: [AgendaEvent] = [], projects: [String], hiddenKeys: Set<String> = [], now: Date = Date()) {
+        hidden = sortedByPriority(tickets.filter { hiddenKeys.contains($0.key) })
+        let visible = tickets.filter { !hiddenKeys.contains($0.key) }
+        let byKey = Dictionary(visible.map { ($0.key, $0) }, uniquingKeysWith: { first, _ in first })
         var linked = Set<String>()
         blocked = events
             .filter { $0.end > now && !$0.isAllDay }
@@ -107,12 +112,13 @@ public struct Backlog: Equatable, Sendable {
                 linked.insert(key)
                 return Blocked(event: event, ticket: ticket)
             }
-        unscheduled = sortedByPriority(tickets.filter { !linked.contains($0.key) })
+        unscheduled = sortedByPriority(visible.filter { !linked.contains($0.key) })
     }
 
-    private init(blocked: [Blocked], unscheduled: [Ticket]) {
+    private init(blocked: [Blocked], unscheduled: [Ticket], hidden: [Ticket]) {
         self.blocked = blocked
         self.unscheduled = unscheduled
+        self.hidden = hidden
     }
 
     /// The rows that match every word of the query, ignoring case and accents: a ticket by its
@@ -125,7 +131,8 @@ public struct Backlog: Equatable, Sendable {
         }
         return Backlog(
             blocked: blocked.filter { matches($0.ticket) || matchesAll(words, in: [$0.event.title]) },
-            unscheduled: unscheduled.filter(matches)
+            unscheduled: unscheduled.filter(matches),
+            hidden: hidden.filter(matches)
         )
     }
 }

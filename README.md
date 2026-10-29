@@ -4,8 +4,9 @@ A macOS menu bar app for the work in front of you: your open Jira tickets by pri
 meetings, and the notifications your tools post, in one panel.
 
 - **List**: the tickets with a block in your calendar, soonest first, then the others, highest
-  priority first. Check a ticket off (it moves to Done), raise or lower its priority, or take its
-  block out of the calendar.
+  priority first. Check a ticket off (it moves to Done), raise or lower its priority, take its
+  block out of the calendar, or hide it: a hidden ticket leaves the list and is never planned,
+  until shown again from the folded "Masqués" section.
 - **Agenda**: today and the next days, from your calendars, with a button to join the video
   call.
 - **Plan with Claude** (`⌘P`, or ✨ on a ticket): Claude proposes a slot and a duration for

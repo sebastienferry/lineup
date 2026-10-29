@@ -1,27 +1,37 @@
 import Foundation
 
-/// Tickets of any project the user pinned to the list by hand, kept in
-/// `~/.config/lineup/pinned.json` apart from the settings, so pinning never rewrites them.
-public struct PinnedTickets: Sendable {
+/// Ticket keys the user chose by hand, kept in a JSON file of `~/.config/lineup` apart from the
+/// settings, so choosing never rewrites them: the pinned tickets, which join the list whatever
+/// the JQL says, and the hidden ones, which leave it.
+public struct TicketKeyList: Sendable {
     let url: URL
 
-    public init(url: URL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".config/lineup/pinned.json")) {
+    public init(url: URL) {
         self.url = url
     }
+
+    public init(file: String) {
+        self.init(url: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".config/lineup/\(file)"))
+    }
+
+    /// Tickets of any project pinned to the list.
+    public static var pinned: TicketKeyList { TicketKeyList(file: "pinned.json") }
+    /// Tickets taken out of the list and out of planning.
+    public static var hidden: TicketKeyList { TicketKeyList(file: "hidden.json") }
 
     public func keys() -> [String] {
         guard let data = try? Data(contentsOf: url), let keys = try? JSONDecoder().decode([String].self, from: data) else { return [] }
         return keys
     }
 
-    public func pin(_ key: String) throws {
+    public func add(_ key: String) throws {
         var keys = keys()
         guard !keys.contains(key) else { return }
         keys.append(key)
         try save(keys)
     }
 
-    public func unpin(_ key: String) throws {
+    public func remove(_ key: String) throws {
         try save(keys().filter { $0 != key })
     }
 
