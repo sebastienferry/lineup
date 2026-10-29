@@ -8,6 +8,9 @@ All notable changes to this project are documented in this file. The format is b
 
 ### Added
 
+- The MCP server installs in Claude Desktop too: `lineup-notify install-mcp` and the settings
+  menu declare it in `claude_desktop_config.json`, keeping the other servers and a backup of the
+  file, and the menu shows where it is registered.
 - Hide a ticket from the list (👁 barré on hover): it leaves both sections and is never offered
   to the planner, until shown again from the folded "Masqués" section at the bottom.
 

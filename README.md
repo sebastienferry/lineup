@@ -122,16 +122,20 @@ run leaves one notification, its latest.
 
 `lineup-notify mcp` serves the inbox over MCP on stdin and stdout. It is local and has no
 authentication: Claude Code starts it as a child process and nothing listens on the network.
-Register it once for every project, from **Réglages › Installer le serveur MCP dans Claude
-Code** in the panel, or from a terminal:
+Register it once, from **Réglages › Installer le serveur MCP** in the panel, or from a
+terminal:
 
 ```bash
 lineup-notify install-mcp
 ```
 
-Both run `claude mcp add --scope user inbox` (the `claudePath` setting says where `claude` is),
-replacing an earlier registration. The menu ticks the entry once Claude Code runs this
-install's server, and shows the version installed; `lineup-notify version` prints it too.
+Both register it with Claude Code for every project (`claude mcp add --scope user inbox`; the
+`claudePath` setting says where `claude` is), and, when Claude Desktop is installed, declare it
+in `~/Library/Application Support/Claude/claude_desktop_config.json` too, since Claude Desktop's
+chat does not read Claude Code's servers. The other servers and settings of that file are kept,
+and the file as it was is saved next to it as `claude_desktop_config.json.lineup-backup`.
+Restart Claude Desktop to load the server. The menu shows where the server is registered and
+the version installed; `lineup-notify version` prints it too.
 
 Claude then has four tools:
 

@@ -311,26 +311,44 @@ final class Store: ObservableObject {
     let version = appVersion()
     /// Whether Claude Code runs this app's inbox server; nil until checked.
     @Published private(set) var isMCPInstalled: Bool?
+    /// Whether Claude Desktop declares it; nil until checked, or when Claude Desktop is absent.
+    @Published private(set) var isDesktopMCPInstalled: Bool?
     @Published private(set) var isInstallingMCP = false
 
     private var mcpSetup: MCPSetup { MCPSetup(claudePath: config.resolvedClaudePath) }
+    private let desktopMCPSetup = DesktopMCPSetup()
 
     func checkMCP() {
-        Task { isMCPInstalled = await mcpSetup.isInstalled(command: notifyExecutablePath()) }
+        let command = notifyExecutablePath()
+        isDesktopMCPInstalled = desktopMCPSetup.isAppPresent ? desktopMCPSetup.isInstalled(command: command) : nil
+        Task { isMCPInstalled = await mcpSetup.isInstalled(command: command) }
     }
 
-    /// Registers the inbox server with Claude Code, for every project.
+    /// Registers the inbox server with Claude Code, for every project, and declares it in
+    /// Claude Desktop when it is installed: its chat reads its own list of servers.
     func installMCP() {
         guard !isInstallingMCP else { return }
         isInstallingMCP = true
+        let command = notifyExecutablePath()
         Task {
+            var failures: [String] = []
             do {
-                try await mcpSetup.install(command: notifyExecutablePath())
-                show("🔌 Serveur MCP « \(MCPSetup.serverName) » installé dans Claude Code")
+                try await mcpSetup.install(command: command)
             } catch {
-                show("⚠ Installation du MCP impossible : \(error.localizedDescription)")
+                failures.append("Claude Code : \(error.localizedDescription)")
             }
-            isMCPInstalled = await mcpSetup.isInstalled(command: notifyExecutablePath())
+            if desktopMCPSetup.isAppPresent {
+                do {
+                    try desktopMCPSetup.install(command: command)
+                } catch {
+                    failures.append("Claude Desktop : \(error.localizedDescription)")
+                }
+            }
+            show(failures.isEmpty
+                ? "🔌 Serveur MCP « \(MCPSetup.serverName) » installé\(desktopMCPSetup.isAppPresent ? " ; redémarre Claude Desktop pour le charger" : "")"
+                : "⚠ Installation du MCP incomplète : \(failures.joined(separator: " · "))")
+            checkMCP()
+            isMCPInstalled = await mcpSetup.isInstalled(command: command)
             isInstallingMCP = false
         }
     }

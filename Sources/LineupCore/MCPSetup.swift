@@ -48,6 +48,66 @@ public struct MCPSetup: Sendable {
     }
 }
 
+/// Registers the inbox's MCP server with Claude Desktop. Its chat does not read Claude Code's
+/// servers: it lists its own in `claude_desktop_config.json`, which this edits in place, keeping
+/// every other server and setting, after a backup of the file as it was.
+public struct DesktopMCPSetup: Sendable {
+    public let url: URL
+
+    public init(url: URL = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent("Library/Application Support/Claude/claude_desktop_config.json")) {
+        self.url = url
+    }
+
+    /// Whether Claude Desktop has run on this Mac: its support folder exists.
+    public var isAppPresent: Bool {
+        FileManager.default.fileExists(atPath: url.deletingLastPathComponent().path)
+    }
+
+    /// The command Claude Desktop runs for the server, or nil when it is not declared.
+    public func registeredCommand() -> String? {
+        guard let config = try? read(), let servers = config["mcpServers"] as? [String: Any],
+              let server = servers[MCPSetup.serverName] as? [String: Any] else { return nil }
+        return server["command"] as? String
+    }
+
+    public func isInstalled(command: String) -> Bool {
+        registeredCommand().map { MCPSetup.sameFile($0, command) } ?? false
+    }
+
+    /// Declares `command mcp` as the server, replacing an earlier declaration of the same name.
+    /// Claude Desktop reads the file when it starts.
+    public func install(command: String) throws {
+        let manager = FileManager.default
+        let exists = manager.fileExists(atPath: url.path)
+        var config = exists ? try read() : [:]
+        var servers = config["mcpServers"] as? [String: Any] ?? [:]
+        servers[MCPSetup.serverName] = ["command": command, "args": ["mcp"]]
+        config["mcpServers"] = servers
+
+        if exists {
+            let backup = url.appendingPathExtension("lineup-backup")
+            try? manager.removeItem(at: backup)
+            try manager.copyItem(at: url, to: backup)
+        } else {
+            try manager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        }
+        let data = try JSONSerialization.data(withJSONObject: config, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
+        try data.write(to: url, options: .atomic)
+        // The file can hold tokens of other servers: keep it readable by its owner only.
+        try manager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+    }
+
+    /// The file as a JSON object; an unreadable one is an error rather than something to replace.
+    public func read() throws -> [String: Any] {
+        let data = try Data(contentsOf: url)
+        guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw ShellError("\(url.lastPathComponent) is not a JSON object; left untouched")
+        }
+        return object
+    }
+}
+
 /// The running executable, its links followed: inside `Lineup.app` for the app and for
 /// `lineup-notify` reached through `~/.local/bin`.
 private var executableURL: URL? { Bundle.main.executableURL?.resolvingSymlinksInPath() }

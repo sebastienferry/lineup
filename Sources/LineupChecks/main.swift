@@ -347,6 +347,42 @@ await check("mcp: a bad call is a tool error, not a protocol error") {
 
 // MARK: MCP setup
 
+await check("desktop: the server joins the other servers and settings, after a backup") {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("lineup-desktop-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    let url = dir.appendingPathComponent("claude_desktop_config.json")
+    try Data(#"{"mcpServers":{"grafana":{"command":"uvx","args":["mcp-grafana"]}},"preferences":{"x":1}}"#.utf8).write(to: url)
+    let setup = DesktopMCPSetup(url: url)
+    try expect(setup.isInstalled(command: "/opt/lineup-notify"), false)
+    try setup.install(command: "/opt/lineup-notify")
+    let config = try setup.read()
+    let servers = config["mcpServers"] as? [String: Any] ?? [:]
+    try expect(servers.keys.sorted(), ["grafana", "inbox"])
+    try expect((servers["inbox"] as? [String: Any])?["args"] as? [String], ["mcp"])
+    try expect((config["preferences"] as? [String: Int])?["x"], 1)
+    try expect(setup.isInstalled(command: "/opt/lineup-notify"), true)
+    try expect(FileManager.default.fileExists(atPath: url.appendingPathExtension("lineup-backup").path), true)
+    let mode = try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? Int
+    try expect(mode, 0o600)
+    try? FileManager.default.removeItem(at: dir)
+}
+await check("desktop: a missing file is created, an unreadable one left alone") {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("lineup-desktop-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    let url = dir.appendingPathComponent("claude_desktop_config.json")
+    try DesktopMCPSetup(url: url).install(command: "/opt/lineup-notify")
+    try expect(DesktopMCPSetup(url: url).registeredCommand(), "/opt/lineup-notify")
+    try Data("not json".utf8).write(to: url)
+    do {
+        try DesktopMCPSetup(url: url).install(command: "/opt/lineup-notify")
+        throw Mismatch(description: "expected an error")
+    } catch is Mismatch {
+        throw Mismatch(description: "expected an error")
+    } catch {
+        try expect(String(decoding: try Data(contentsOf: url), as: UTF8.self), "not json")
+    }
+    try? FileManager.default.removeItem(at: dir)
+}
 await check("setup: the registered command is read from claude mcp get") {
     let runner = FakeRunner()
     runner.outputs["mcp"] = ShellResult(exitCode: 0, stdout: """

@@ -9,7 +9,7 @@ let usage = """
            lineup-notify read ID... | --all
            lineup-notify dismiss ID... | --read
            lineup-notify mcp           serve the inbox over MCP on stdin and stdout
-           lineup-notify install-mcp   register that server with Claude Code, for every project
+           lineup-notify install-mcp   register that server with Claude Code and Claude Desktop
            lineup-notify version
     """
 
@@ -85,6 +85,11 @@ do {
         let command = notifyExecutablePath()
         try await MCPSetup(claudePath: Config.load().resolvedClaudePath).install(command: command)
         print("Registered the \(MCPSetup.serverName) MCP server with Claude Code: \(command) mcp")
+        let desktop = DesktopMCPSetup()
+        if desktop.isAppPresent {
+            try desktop.install(command: command)
+            print("Declared it in Claude Desktop (\(desktop.url.path)); restart Claude Desktop to load it")
+        }
     case "version", "--version":
         print(appVersion())
     case "-h", "--help", "help":

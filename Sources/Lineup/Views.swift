@@ -120,6 +120,10 @@ struct Footer: View {
                 Text("Lineup \(store.version)")
                 Divider()
                 Button("Ouvrir les réglages…") { store.openConfig() }
+                Text(mcpStatus("Claude Code", store.isMCPInstalled))
+                if let desktop = store.isDesktopMCPInstalled {
+                    Text(mcpStatus("Claude Desktop", desktop))
+                }
                 Button(mcpLabel) { store.installMCP() }
                     .disabled(store.isInstallingMCP)
             } label: {
@@ -142,9 +146,17 @@ struct Footer: View {
 
     private var mcpLabel: String {
         if store.isInstallingMCP { return "Installation du serveur MCP…" }
-        return store.isMCPInstalled == true
-            ? "✓ Serveur MCP installé dans Claude Code (réinstaller)"
-            : "Installer le serveur MCP dans Claude Code"
+        let everywhere = store.isMCPInstalled == true && store.isDesktopMCPInstalled != false
+        return everywhere ? "Réinstaller le serveur MCP" : "Installer le serveur MCP"
+    }
+
+    /// One line of the menu: where the inbox server is, or is not, registered.
+    private func mcpStatus(_ app: String, _ isInstalled: Bool?) -> String {
+        switch isInstalled {
+        case true?: return "✓ MCP « \(MCPSetup.serverName) » dans \(app)"
+        case false?: return "✗ MCP absent de \(app)"
+        case nil: return "… MCP dans \(app) : vérification"
+        }
     }
 }
 
